@@ -164,9 +164,9 @@ def _cleanup_queue(job_id: str):
 
 def _safe_filename(filename: str) -> str:
     """Sanitize uploaded filename to prevent path traversal."""
-    # Strip path components, keep only the basename
-    name = os.path.basename(filename)
-    # Remove any remaining path separators or suspicious chars
+    # Normalize backslashes to forward slashes for cross-platform safety
+    normalized = filename.replace('\\', '/')
+    name = os.path.basename(normalized)
     name = name.replace('\\', '').replace('/', '').replace('\x00', '')
     if not name:
         name = 'upload'
