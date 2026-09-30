@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>LeadGen Pro — Mobile Lead Discovery & Outreach Monolith</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Local Standalone Monolith Libraries (Zero Server Dependency) -->
+  <script src="seed_data.js"></script>
+  <script src="xlsx.full.min.js"></script>
+  <script src="leadgen_engine.js"></script>
+  <style>
+    :root {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top: env(safe-area-inset-top, 0px);
+    }
+    h1, h2, h3, h4, .font-heading {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .toast-enter { animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    .toast-exit { animation: toastOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(-12px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-12px) scale(0.96); } }
+    .nav-tab-active {
+      background-color: #f1f5f9;
+      color: #4f46e5;
+      font-weight: 700;
+    }
+    .mobile-tab-active {
+      color: #4f46e5 !important;
+    }
+    .mobile-tab-active svg {
+      stroke: #4f46e5 !important;
+    }
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col antialiased text-slate-800 bg-slate-50 selection:bg-indigo-500 selection:text-white pb-24 md:pb-12">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed top-3 right-3 sm:top-5 sm:right-5 z-50 flex flex-col gap-2 max-w-sm w-[92vw] sm:w-full pointer-events-none"></div>
+
+  <!-- Corporate Header -->
+  <header class="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-indigo-950/20 border border-indigo-500/20 flex-shrink-0">
+          <i data-lucide="compass" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-300"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <span class="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 font-heading">LeadGen Pro</span>
+            <span class="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 tracking-wide uppercase">Standalone App</span>
+          </div>
+          <p class="text-[11px] text-slate-500 hidden sm:block">On-Device Lead Extraction &amp; Cold Email Automation</p>
+        </div>
+      </div>
+
+      <!-- Desktop Nav Tabs -->
+      <nav class="hidden md:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 text-xs font-semibold text-slate-600">
+        <button type="button" class="nav-desktop-tab px-3 py-1.5 rounded-lg nav-tab-active transition-colors cursor-pointer" data-target="searchSection">
+          <span class="flex items-center gap-1.5"><i data-lucide="search" class="w-3.5 h-3.5"></i> Discovery</span>
+        </button>
+        <button type="button" class="nav-desktop-tab px-3 py-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer" data-target="resultsSection">
+          <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5"></i> Leads <span id="desktopNavLeadCount" class="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 font-bold hidden">0</span></span>
+        </button>
+        <button type="button" class="nav-desktop-tab px-3 py-1.5 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer" data-target="outreachSection">
+          <span class="flex items-center gap-1.5"><i data-lucide="send" class="w-3.5 h-3.5"></i> Outreach</span>
+        </button>
+      </nav>
+      
+      <!-- Telemetry & Actions -->
+      <div class="flex items-center gap-2">
+        
+        <!-- App Status Pill (Standalone / On-Device) -->
+        <button
+          type="button"
+          id="btnOpenServerConfig"
+          title="Engine Status"
+          class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100 transition-colors cursor-pointer"
+        >
+          <span id="serverStatusDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="serverStatusText">On-Device Engine</span>
+        </button>
+
+        <!-- AI Health Status -->
+        <div id="aiHealthBadge" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/80">
+          <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          <span>Gemini AI Active</span>
+        </div>
+
+        <!-- Download APK Button -->
+        <a
+          href="/download-apk"
+          download="LeadGenPro-debug.apk"
+          id="btnDownloadApk"
+          title="Download Android APK"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors shadow-2xs cursor-pointer active:scale-98"
+        >
+          <i data-lucide="smartphone" class="w-3.5 h-3.5 text-indigo-600"></i>
+          <span class="hidden sm:inline">Get APK</span>
+          <span class="sm:hidden text-[10px]">APK</span>
+        </a>
+
+        <!-- History Button -->
+        <button
+          type="button"
+          id="btnOpenHistory"
+          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition-colors shadow-2xs cursor-pointer active:scale-98"
+        >
+          <i data-lucide="history" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span class="hidden sm:inline">History</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workstation Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-7 space-y-6 sm:space-y-8">
+
+    <!-- STEP 1: Discovery Workstation (Search & Parameters) -->
+    <section id="searchSection" class="bg-white rounded-2xl p-5 sm:p-7 shadow-sm border border-slate-200/90 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-indigo-50/60 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4 mb-5">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs flex items-center justify-center font-bold shadow-xs">1</span>
+            <h2 class="text-base sm:text-xl font-bold text-slate-900 font-heading tracking-tight">On-Device Lead Discovery &amp; Web Extraction</h2>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">
+            Search any niche and city. Your phone searches DuckDuckGo &amp; Bing, parses top websites directly, and extracts all verified leads with zero external server.
+          </p>
+        </div>
+      </div>
+
+      <!-- Search Input Form -->
+      <form id="searchForm" class="space-y-4 relative z-10">
+        <div class="relative flex flex-col sm:flex-row items-stretch gap-2 sm:gap-0">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="search" class="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500"></i>
+            </div>
+            <input
+              type="text"
+              id="searchQuery"
+              required
+              placeholder="e.g. Pet shops in Hyderabad, Catering services Mumbai, Gyms Bangalore"
+              class="w-full pl-10 pr-4 sm:pr-36 py-3 bg-slate-50 hover:bg-slate-100/60 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 text-xs sm:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-all shadow-inner"
+            />
+          </div>
+          <div class="sm:absolute sm:inset-y-0 sm:right-1.5 flex items-center">
+            <button
+              type="submit"
+              id="btnStartSearch"
+              class="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold text-xs sm:text-sm rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm hover:shadow-md cursor-pointer active:scale-98"
+            >
+              <span>Discover Leads</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Idea Pills & Crawl Scope -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500 pt-1">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-medium text-slate-600 text-[11px]">Popular:</span>
+            <button type="button" class="quick-query-pill px-2.5 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200/80 transition-colors cursor-pointer text-[11px]" data-q="Pet shops in Hyderabad">Pet shops Hyderabad</button>
+            <button type="button" class="quick-query-pill px-2.5 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200/80 transition-colors cursor-pointer text-[11px]" data-q="Catering services in Mumbai">Catering Mumbai</button>
+            <button type="button" class="quick-query-pill px-2.5 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200/80 transition-colors cursor-pointer text-[11px]" data-q="Solar panel dealers Bangalore">Solar Bangalore</button>
+            <button type="button" class="quick-query-pill px-2.5 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200/80 transition-colors cursor-pointer text-[11px]" data-q="Hostels for women Pune">Hostels Pune</button>
+          </div>
+
+          <div class="flex items-center gap-2 self-start sm:self-auto">
+            <label class="text-slate-600 font-medium text-[11px]">Websites to Crawl:</label>
+            <div class="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5" id="siteCountGroup">
+              <button type="button" class="site-count-btn px-2 py-0.5 text-xs font-semibold rounded-md transition-colors" data-count="5">5</button>
+              <button type="button" class="site-count-btn px-2.5 py-0.5 text-xs font-semibold rounded-md bg-white text-indigo-700 shadow-xs" data-count="10">10 Sites</button>
+              <button type="button" class="site-count-btn px-2 py-0.5 text-xs font-semibold rounded-md transition-colors" data-count="15">15</button>
+              <button type="button" class="site-count-btn px-2 py-0.5 text-xs font-semibold rounded-md transition-colors" data-count="20">20</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- STEP 2: Live Progress & Telemetry Monitor -->
+    <section id="progressSection" class="hidden bg-white rounded-2xl p-5 sm:p-7 shadow-sm border border-indigo-100 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+            <i data-lucide="activity" class="w-4 h-4 animate-spin"></i>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-bold text-slate-900 font-heading" id="progressTaskTitle">Extraction in Progress</h3>
+            <p class="text-xs text-slate-500" id="progressStatusMessage">Executing search engines on device...</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <span class="text-xs font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200" id="progressPercentText">0%</span>
+          <button
+            type="button"
+            id="btnCancelTask"
+            class="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 rounded hover:bg-rose-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Linear Progress Bar -->
+      <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/80">
+        <div id="progressBarFill" class="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 rounded-full transition-all duration-300 w-0"></div>
+      </div>
+
+      <!-- Real-Time Metric Tiles -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 pt-1">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+          <div class="text-[11px] font-medium text-slate-500">Found Listings</div>
+          <div class="text-lg sm:text-xl font-extrabold text-slate-900 mt-0.5 font-heading" id="liveTotalCount">0</div>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+          <div class="text-[11px] font-medium text-slate-500">Phone Numbers</div>
+          <div class="text-lg sm:text-xl font-extrabold text-indigo-600 mt-0.5 font-heading" id="livePhoneCount">0</div>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+          <div class="text-[11px] font-medium text-slate-500">Emails Captured</div>
+          <div class="text-lg sm:text-xl font-extrabold text-emerald-600 mt-0.5 font-heading" id="liveEmailCount">0</div>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
+          <div class="text-[11px] font-medium text-slate-500">Engine / Step</div>
+          <div class="text-xs sm:text-sm font-bold text-slate-700 mt-1 truncate" id="liveStepText">Initializing</div>
+        </div>
+      </div>
+
+      <!-- Live Terminal Output Ticker -->
+      <div class="bg-slate-950 rounded-xl p-3.5 text-[11px] font-mono text-slate-300 max-h-36 overflow-y-auto space-y-1 custom-scrollbar border border-slate-800" id="logBox">
+        <div class="text-slate-500">Awaiting search execution telemetry...</div>
+      </div>
+    </section>
+
+    <!-- STEP 3: Verified Leads Table & Selection Hub -->
+    <section id="resultsSection" class="hidden bg-white rounded-2xl p-4 sm:p-7 shadow-sm border border-slate-200/90 space-y-4">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-emerald-600 text-white text-xs flex items-center justify-center font-bold shadow-xs">2</span>
+            <h2 class="text-base sm:text-xl font-bold text-slate-900 font-heading tracking-tight">Verified Sourced Leads</h2>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-500 mt-0.5" id="resultsSummaryText">0 verified business listings discovered.</p>
+        </div>
+
+        <!-- Action Tools: Export (100% On-Device XLSX & CSV) & Launch -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            id="btnDownloadExcel"
+            class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+          >
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Export Excel (.xlsx)</span>
+          </button>
+
+          <button
+            type="button"
+            id="btnDownloadCsv"
+            class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+          >
+            <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-600"></i>
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            type="button"
+            id="btnProceedOutreach"
+            class="px-4 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
+          >
+            <i data-lucide="mail" class="w-3.5 h-3.5"></i>
+            <span id="proceedOutreachText">Launch Outreach (0 Selected)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Filter & Selection Toolbar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+        <div class="flex items-center gap-2 flex-wrap text-xs">
+          <span class="text-slate-500 font-medium">Select:</span>
+          <button type="button" id="btnSelectWithEmail" class="px-2.5 py-1 rounded bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-300 font-semibold cursor-pointer shadow-2xs">
+            All With Email
+          </button>
+          <button type="button" id="btnSelectAll" class="px-2.5 py-1 rounded bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-300 font-semibold cursor-pointer shadow-2xs">
+            Select All
+          </button>
+          <button type="button" id="btnClearSelection" class="px-2.5 py-1 rounded bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 font-semibold cursor-pointer shadow-2xs">
+            Clear
+          </button>
+          <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200" id="selectionCountBadge">
+            0 selected
+          </span>
+        </div>
+
+        <!-- Live Debounced Search Filter -->
+        <div class="relative w-full sm:w-64">
+          <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          </div>
+          <input
+            type="text"
+            id="tableSearchInput"
+            placeholder="Search leads by name, phone, city..."
+            class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-2xs"
+          />
+        </div>
+      </div>
+
+      <!-- DESKTOP TABLE VIEW (Screens >= md) -->
+      <div class="hidden md:block border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+        <div class="overflow-x-auto max-h-[500px] custom-scrollbar">
+          <table class="w-full text-left text-xs text-slate-700 border-collapse">
+            <thead class="bg-slate-100/90 text-slate-600 font-bold sticky top-0 z-10 border-b border-slate-200">
+              <tr>
+                <th class="p-3 w-10 text-center">
+                  <input type="checkbox" id="thMasterCheckbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                </th>
+                <th class="p-3">Business Name</th>
+                <th class="p-3">Phone</th>
+                <th class="p-3">Email</th>
+                <th class="p-3">City / Area</th>
+                <th class="p-3">Rating</th>
+                <th class="p-3">Website</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-100 bg-white">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MOBILE CARD VIEW (Screens < md) -->
+      <div id="mobileCardsContainer" class="md:hidden space-y-2.5 max-h-[520px] overflow-y-auto custom-scrollbar">
+        <!-- Rendered via JS on mobile -->
+      </div>
+
+      <!-- Table Pagination Bar -->
+      <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+        <span id="paginationInfo">Showing 0 of 0 leads</span>
+        <div class="flex items-center gap-1.5" id="paginationControls"></div>
+      </div>
+    </section>
+
+    <!-- STEP 4: Campaign Studio & AI Outreach Hub -->
+    <section id="outreachSection" class="bg-white rounded-2xl p-5 sm:p-7 shadow-sm border border-slate-200/90 space-y-6">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-purple-600 text-white text-xs flex items-center justify-center font-bold shadow-xs">3</span>
+            <h2 class="text-base sm:text-xl font-bold text-slate-900 font-heading tracking-tight">Campaign Studio &amp; 1-Click Outreach</h2>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Personalize cold outreach using battle-tested templates or Google Gemini AI directly on your device.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="px-3 py-1.5 bg-purple-50 border border-purple-200/80 rounded-xl flex items-center gap-2 text-xs font-bold text-purple-800 shadow-2xs">
+            <i data-lucide="users" class="w-4 h-4 text-purple-600"></i>
+            <span id="outreachAudienceSummary">Targeting: 0 Verified Leads</span>
+          </div>
+          <button type="button" id="btnQuickSelectOutreach" class="px-2.5 py-1 text-xs font-semibold bg-white border border-purple-300 rounded-lg text-purple-700 hover:bg-purple-50 cursor-pointer shadow-2xs">
+            Select All With Email
+          </button>
+        </div>
+      </div>
+
+      <!-- 1-TAP CAMPAIGN PRESETS -->
+      <div class="bg-gradient-to-r from-purple-50 via-indigo-50 to-slate-50 p-3.5 rounded-xl border border-purple-100 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="zap" class="w-4 h-4 text-purple-600"></i> 1-Tap High-Converting Outreach Presets:
+          </span>
+          <span class="text-[10px] text-purple-700 font-medium">Click to load instantly</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <button type="button" class="campaign-preset-btn p-2 text-left bg-white border border-purple-200 rounded-lg hover:border-purple-500 hover:shadow-xs transition-all cursor-pointer" data-preset="intro">
+            <div class="text-[11px] font-bold text-slate-900 flex items-center gap-1">🚀 Quick B2B Intro</div>
+            <div class="text-[10px] text-slate-500 truncate">Punchy 5-min chat invite</div>
+          </button>
+          <button type="button" class="campaign-preset-btn p-2 text-left bg-white border border-purple-200 rounded-lg hover:border-purple-500 hover:shadow-xs transition-all cursor-pointer" data-preset="value">
+            <div class="text-[11px] font-bold text-slate-900 flex items-center gap-1">💼 Value Offer &amp; ROI</div>
+            <div class="text-[10px] text-slate-500 truncate">Cost cutting &amp; demo pitch</div>
+          </button>
+          <button type="button" class="campaign-preset-btn p-2 text-left bg-white border border-purple-200 rounded-lg hover:border-purple-500 hover:shadow-xs transition-all cursor-pointer" data-preset="partnership">
+            <div class="text-[11px] font-bold text-slate-900 flex items-center gap-1">🤝 Partnership Inquiry</div>
+            <div class="text-[10px] text-slate-500 truncate">Mutual referral proposal</div>
+          </button>
+          <button type="button" class="campaign-preset-btn p-2 text-left bg-white border border-purple-200 rounded-lg hover:border-purple-500 hover:shadow-xs transition-all cursor-pointer" data-preset="lavender">
+            <div class="text-[11px] font-bold text-slate-900 flex items-center gap-1">⚡ Lavender &lt;60 Words</div>
+            <div class="text-[10px] text-slate-500 truncate">Ultra-short direct ask</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Two-Column Studio Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: Gemini AI Copywriting Engine (5 Cols) -->
+        <div class="lg:col-span-5 bg-gradient-to-br from-purple-50/40 via-indigo-50/20 to-slate-50/60 rounded-xl p-4 sm:p-5 border border-purple-100 space-y-3.5 shadow-2xs">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-lg bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              </div>
+              <h3 class="text-xs sm:text-sm font-bold text-slate-900 font-heading">Gemini AI Copywriter</h3>
+            </div>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 uppercase tracking-wider">On-Device AI</span>
+          </div>
+
+          <div class="space-y-2.5">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">What are you offering? (Product / Pitch)</label>
+              <input
+                type="text"
+                id="aiProductName"
+                placeholder="e.g. Wholesale Dog Food with 35% margin & same-day restocking"
+                class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs"
+              />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Core Benefit / Details (Optional)</label>
+              <textarea
+                id="aiProductDesc"
+                rows="2"
+                placeholder="e.g. Guaranteed 30-day return policy, free display racks, priority shipping."
+                class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs"
+              ></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Target Niche</label>
+                <input
+                  type="text"
+                  id="aiTargetNiche"
+                  placeholder="Auto-detected from search"
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Tone</label>
+                <select id="aiToneSelect" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs">
+                  <option value="conversational" selected>Conversational</option>
+                  <option value="direct">Direct (&lt;75 words)</option>
+                  <option value="professional">Professional B2B</option>
+                  <option value="friendly">Friendly & Warm</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Demo Video Link / URL</label>
+                <input
+                  type="url"
+                  id="aiVideoLink"
+                  placeholder="https://youtu.be/..."
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-purple-600 shadow-2xs"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-700 mb-1">API Key Override (Optional)</label>
+                <input
+                  type="password"
+                  id="aiKeyOverride"
+                  placeholder="Uses pre-configured Gemini key"
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 font-mono shadow-2xs"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              id="btnGenerateAiEmail"
+              class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer active:scale-98"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Generate Email with Gemini AI</span>
+            </button>
+          </div>
+
+          <!-- Suggested Subject Lines -->
+          <div id="aiSuggestionsBox" class="hidden pt-2 border-t border-purple-200/60 space-y-1.5">
+            <span class="text-[11px] font-bold text-purple-900 font-heading">Alternative Subject Lines:</span>
+            <div id="aiSubjectList" class="flex flex-col gap-1"></div>
+            <p id="aiStrategyReasoning" class="text-[10px] text-purple-800 bg-purple-100/70 p-2 rounded-lg leading-relaxed"></p>
+          </div>
+        </div>
+
+        <!-- Right: Campaign Editor & Dispatcher (7 Cols) -->
+        <div class="lg:col-span-7 space-y-3.5">
+          
+          <!-- Subject Line -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 font-heading">Subject Line</label>
+              <span class="text-[11px] text-slate-400">Supports merge tags</span>
+            </div>
+            <input
+              type="text"
+              id="campaignSubject"
+              required
+              placeholder="quick question re: {business_name}"
+              class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-2xs"
+            />
+          </div>
+
+          <!-- Merge Tag Helper Toolbar -->
+          <div class="flex items-center gap-1 flex-wrap">
+            <span class="text-[11px] font-bold text-slate-500 mr-0.5">Tags:</span>
+            <button type="button" class="btn-tag px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs" data-tag="{business_name}">+ Business</button>
+            <button type="button" class="btn-tag px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs" data-tag="{contact_person}">+ Contact</button>
+            <button type="button" class="btn-tag px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs" data-tag="{city}">+ City</button>
+            <button type="button" class="btn-tag px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs" data-tag="{video_link}">+ Video</button>
+            <button type="button" class="btn-tag px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 cursor-pointer shadow-2xs" data-tag="{sender_name}">+ Sender</button>
+          </div>
+
+          <!-- Email Body Textarea -->
+          <div>
+            <textarea
+              id="campaignBody"
+              rows="7"
+              required
+              placeholder="Hi {contact_person}, noticed {business_name} in {city}..."
+              class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 leading-relaxed font-sans shadow-2xs"
+            ></textarea>
+          </div>
+
+          <!-- Instant In-Page Live Preview Card -->
+          <div class="border border-slate-200 rounded-xl bg-slate-50/80 p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="eye" class="w-3.5 h-3.5 text-indigo-600"></i>
+                <span>Instant Lead Preview:</span>
+                <span id="inlinePreviewLeadName" class="text-slate-500 font-normal truncate max-w-[200px]">(Select a lead)</span>
+              </span>
+              <button type="button" id="btnPreviewEmail" class="text-xs text-indigo-600 hover:underline font-semibold cursor-pointer">
+                Full Modal Preview
+              </button>
+            </div>
+            <div class="bg-white p-2.5 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
+              <div class="text-[11px] text-slate-400 font-medium">Subject: <span id="inlinePreviewSubject" class="text-slate-800 font-bold">quick question re: {business_name}</span></div>
+              <div id="inlinePreviewBody" class="text-slate-600 line-clamp-3 whitespace-pre-line text-[11px] pt-1 border-t border-slate-100">
+                Hi {contact_person}, noticed {business_name}...
+              </div>
+            </div>
+          </div>
+
+          <!-- 1-TAP NATIVE MOBILE DISPATCH BUTTON -->
+          <div class="pt-1 space-y-2">
+            <button
+              type="button"
+              id="btnNativeMail"
+              class="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-800 hover:from-indigo-700 hover:to-indigo-900 text-white text-xs sm:text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-md hover:shadow-lg cursor-pointer active:scale-98"
+            >
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>1-Tap Open in Gmail / Mobile Mail App</span>
+            </button>
+            <p class="text-[11px] text-slate-400 text-center">Opens Gmail or default email app directly on your phone with lead email &amp; pitch ready to send.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 flex justify-around py-2 px-1 shadow-lg text-[11px] font-semibold text-slate-500">
+    <button type="button" class="mobile-tab-btn flex flex-col items-center gap-0.5 mobile-tab-active" data-target="searchSection">
+      <i data-lucide="search" class="w-4 h-4"></i>
+      <span>Discovery</span>
+    </button>
+    <button type="button" class="mobile-tab-btn flex flex-col items-center gap-0.5" data-target="resultsSection">
+      <div class="relative">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        <span id="mobileNavLeadDot" class="absolute -top-1 -right-2 w-2 h-2 bg-indigo-600 rounded-full hidden"></span>
+      </div>
+      <span>Leads</span>
+    </button>
+    <button type="button" class="mobile-tab-btn flex flex-col items-center gap-0.5" data-target="outreachSection">
+      <i data-lucide="mail" class="w-4 h-4"></i>
+      <span>Outreach</span>
+    </button>
+    <button type="button" class="mobile-tab-btn flex flex-col items-center gap-0.5" id="btnMobileServerSettings">
+      <i data-lucide="smartphone" class="w-4 h-4"></i>
+      <span>Engine</span>
+    </button>
+  </nav>
+
+  <!-- Live Email Preview Modal -->
+  <div id="previewModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[88vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 font-heading">Email Live Preview</h3>
+          <p class="text-xs text-slate-500" id="previewLeadInfo">Rendered for: Sample Business</p>
+        </div>
+        <button type="button" id="btnClosePreview" class="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+        <div class="p-3 bg-slate-100 rounded-lg text-xs font-semibold text-slate-800">
+          <span class="text-slate-500 font-normal">Subject: </span>
+          <span id="previewSubjectText"></span>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl p-3 bg-slate-50">
+          <iframe id="previewIframe" class="w-full h-80 border-0 rounded-lg bg-white" sandbox="allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+        <button type="button" id="btnClosePreviewBottom" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg cursor-pointer">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job History Modal -->
+  <div id="historyModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[82vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4 text-slate-600"></i>
+          <h3 class="text-sm sm:text-base font-bold text-slate-900 font-heading">Previous Sourcing Datasets</h3>
+        </div>
+        <button type="button" id="btnCloseHistory" class="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-2.5 custom-scrollbar flex-1" id="historyListContainer">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Application Engine -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // Application State Model
+    const AppState = {
+      currentJobId: null,
+      selectedSiteCount: 10,
+      allLeads: [],
+      filteredLeads: [],
+      selectedLeadIds: new Set(),
+      currentPage: 1,
+      pageSize: 50,
+      isStandaloneRunning: false
+    };
+
+    // Notification Toast System
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const styles = {
+        success: 'bg-emerald-900 text-white border-emerald-950',
+        error: 'bg-rose-900 text-white border-rose-950',
+        info: 'bg-slate-900 text-white border-slate-950',
+        warning: 'bg-amber-800 text-white border-amber-950',
+      };
+
+      toast.className = `toast-enter pointer-events-auto px-3.5 py-2.5 rounded-xl shadow-xl border text-xs font-semibold flex items-center justify-between gap-3 ${styles[type] || styles.info}`;
+      toast.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span>${escapeHtml(message)}</span>
+        </div>
+        <button class="opacity-75 hover:opacity-100 text-white cursor-pointer">&times;</button>
+      `;
+
+      toast.querySelector('button').addEventListener('click', () => removeToast(toast));
+      container.appendChild(toast);
+      setTimeout(() => removeToast(toast), 4500);
+    }
+
+    function removeToast(toast) {
+      toast.classList.remove('toast-enter');
+      toast.classList.add('toast-exit');
+      setTimeout(() => toast.remove(), 220);
+    }
+
+    // Query pills and site count buttons
+    document.querySelectorAll('.quick-query-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = btn.getAttribute('data-q');
+        document.getElementById('searchQuery').value = q;
+        document.getElementById('searchQuery').focus();
+      });
+    });
+
+    document.querySelectorAll('.site-count-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.site-count-btn').forEach(b => {
+          b.className = 'site-count-btn px-2.5 py-1 text-xs font-semibold rounded-md transition-colors';
+        });
+        btn.className = 'site-count-btn px-2.5 py-1 text-xs font-semibold rounded-md bg-white text-indigo-700 shadow-xs';
+        AppState.selectedSiteCount = parseInt(btn.getAttribute('data-count'), 10) || 10;
+      });
+    });
+
+    // Search Submissions (Standalone Monolith on Phone)
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = document.getElementById('searchQuery').value.trim();
+      if (!query) return;
+
+      // Auto-populate AI Niche from search
+      const nicheInput = document.getElementById('aiTargetNiche');
+      if (!nicheInput.value) {
+        nicheInput.value = query.replace(/\s+in\s+.*$/i, '').trim();
+      }
+
+      startStandaloneJob(query, AppState.selectedSiteCount, `Discovery: "${query}"`);
+    });
+
+    // Standalone On-Device Search Execution
+    async function startStandaloneJob(query, numWebsites, taskTitle) {
+      resetProgressUI(taskTitle);
+      AppState.isStandaloneRunning = true;
+
+      try {
+        const leads = await MobileEngine.Scraper.runDiscovery(query, numWebsites, (update) => {
+          updateProgressDisplay(update);
+        });
+
+        const newJob = {
+          id: 'job_' + Date.now().toString(36),
+          query: query,
+          type: 'mobile_discovery',
+          status: 'completed',
+          lead_count: leads.length,
+          created_at: new Date().toISOString()
+        };
+
+        MobileEngine.DB.saveJob(newJob, leads);
+        setLoadedLeads(leads, newJob.id);
+        showToast(`Extraction complete! Found ${leads.length} verified leads on device.`, 'success');
+
+      } catch (err) {
+        showToast(err.message || 'Discovery search failed', 'error');
+        document.getElementById('progressSection').classList.add('hidden');
+      } finally {
+        AppState.isStandaloneRunning = false;
+      }
+    }
+
+    function resetProgressUI(title) {
+      document.getElementById('progressSection').classList.remove('hidden');
+      document.getElementById('progressSection').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('progressTaskTitle').textContent = title;
+      document.getElementById('progressStatusMessage').textContent = 'Connecting on-device crawler...';
+      document.getElementById('progressPercentText').textContent = '0%';
+      document.getElementById('progressBarFill').style.width = '0%';
+      document.getElementById('liveTotalCount').textContent = '0';
+      document.getElementById('livePhoneCount').textContent = '0';
+      document.getElementById('liveEmailCount').textContent = '0';
+      document.getElementById('liveStepText').textContent = 'Starting';
+      document.getElementById('logBox').innerHTML = '';
+      appendLog('On-device crawler initialized (Zero external backend).');
+    }
+
+    function appendLog(msg) {
+      const box = document.getElementById('logBox');
+      const time = new Date().toLocaleTimeString();
+      const line = document.createElement('div');
+      line.className = 'text-slate-300';
+      line.textContent = `[${time}] ${msg}`;
+      box.appendChild(line);
+
+      while (box.children.length > 50) {
+        box.removeChild(box.firstChild);
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function updateProgressDisplay(d) {
+      if (d.percent !== undefined) {
+        document.getElementById('progressPercentText').textContent = `${d.percent}%`;
+        document.getElementById('progressBarFill').style.width = `${d.percent}%`;
+      }
+      if (d.message) {
+        document.getElementById('progressStatusMessage').textContent = d.message;
+        appendLog(d.message);
+      }
+      if (d.count !== undefined) document.getElementById('liveTotalCount').textContent = d.count;
+      if (d.phone_count !== undefined) document.getElementById('livePhoneCount').textContent = d.phone_count;
+      if (d.email_count !== undefined) document.getElementById('liveEmailCount').textContent = d.email_count;
+      if (d.step) document.getElementById('liveStepText').textContent = d.step;
+    }
+
+    document.getElementById('btnCancelTask').addEventListener('click', () => {
+      AppState.isStandaloneRunning = false;
+      showToast('Search stopped by user', 'warning');
+      document.getElementById('progressSection').classList.add('hidden');
+    });
+
+    // Populate Results into UI
+    function setLoadedLeads(leads, jobId) {
+      AppState.currentJobId = jobId;
+      AppState.allLeads = leads || [];
+      AppState.filteredLeads = [...AppState.allLeads];
+      AppState.selectedLeadIds.clear();
+
+      // Auto-select leads with email addresses
+      AppState.allLeads.forEach(l => {
+        if (l.email && l.email.includes('@')) {
+          AppState.selectedLeadIds.add(l.id);
+        }
+      });
+
+      const total = AppState.allLeads.length;
+      const withEmail = AppState.allLeads.filter(l => l.email && l.email.includes('@')).length;
+      const withPhone = AppState.allLeads.filter(l => l.phone).length;
+      document.getElementById('resultsSummaryText').textContent = 
+        `Found ${total} verified listings (${withEmail} with email, ${withPhone} with phone number).`;
+
+      // Update Nav Count
+      const countBadge = document.getElementById('desktopNavLeadCount');
+      countBadge.textContent = total;
+      countBadge.classList.remove('hidden');
+      document.getElementById('mobileNavLeadDot').classList.remove('hidden');
+
+      document.getElementById('resultsSection').classList.remove('hidden');
+      AppState.currentPage = 1;
+      renderTablePage();
+      updateSelectionCounters();
+      updateInlinePreview();
+    }
+
+    // Debounced search
+    let searchDebounceTimer;
+    document.getElementById('tableSearchInput').addEventListener('input', (e) => {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        const query = e.target.value.toLowerCase().trim();
+        if (!query) {
+          AppState.filteredLeads = [...AppState.allLeads];
+        } else {
+          AppState.filteredLeads = AppState.allLeads.filter(l => 
+            (l.name || '').toLowerCase().includes(query) ||
+            (l.email || '').toLowerCase().includes(query) ||
+            (l.phone || '').toLowerCase().includes(query) ||
+            (l.city || '').toLowerCase().includes(query) ||
+            (l.area || '').toLowerCase().includes(query)
+          );
+        }
+        AppState.currentPage = 1;
+        renderTablePage();
+      }, 180);
+    });
+
+    // Dual Rendering: Table on Desktop, Cards on Mobile
+    function renderTablePage() {
+      const tbody = document.getElementById('tableBody');
+      const mobileCards = document.getElementById('mobileCardsContainer');
+      tbody.innerHTML = '';
+      mobileCards.innerHTML = '';
+
+      const totalItems = AppState.filteredLeads.length;
+      const startIdx = (AppState.currentPage - 1) * AppState.pageSize;
+      const endIdx = Math.min(startIdx + AppState.pageSize, totalItems);
+      const pageSlice = AppState.filteredLeads.slice(startIdx, endIdx);
+
+      if (pageSlice.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">No matching leads found.</td></tr>`;
+        mobileCards.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">No matching leads found.</div>`;
+        document.getElementById('paginationInfo').textContent = `Showing 0 of ${totalItems} leads`;
+        document.getElementById('paginationControls').innerHTML = '';
+        return;
+      }
+
+      pageSlice.forEach(lead => {
+        const isSelected = AppState.selectedLeadIds.has(lead.id);
+        const hasEmail = Boolean(lead.email && lead.email.includes('@'));
+
+        // 1. Desktop Table Row
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-purple-50/40' : ''}`;
+        
+        tr.innerHTML = `
+          <td class="p-3 text-center">
+            <input
+              type="checkbox"
+              class="lead-checkbox rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+              data-id="${lead.id}"
+              ${isSelected ? 'checked' : ''}
+            />
+          </td>
+          <td class="p-3 font-semibold text-slate-900">
+            <div class="font-heading">${escapeHtml(lead.name || 'Unknown Business')}</div>
+            ${lead.contact_person ? `<div class="text-[11px] font-normal text-slate-500">Contact: ${escapeHtml(lead.contact_person)}</div>` : ''}
+          </td>
+          <td class="p-3 font-mono text-slate-700">
+            ${lead.phone ? `<a href="tel:${escapeHtml(lead.phone)}" class="hover:text-indigo-600 hover:underline flex items-center gap-1">${escapeHtml(lead.phone)}</a>` : '<span class="text-slate-300">—</span>'}
+          </td>
+          <td class="p-3">
+            ${hasEmail 
+              ? `<span class="inline-flex items-center gap-1 font-medium text-emerald-700"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> ${escapeHtml(lead.email)}</span>` 
+              : '<span class="text-slate-300">Not found</span>'}
+          </td>
+          <td class="p-3 text-slate-600">
+            <div>${escapeHtml(lead.city || '—')}</div>
+            ${lead.area ? `<div class="text-[11px] text-slate-400 truncate max-w-[140px]">${escapeHtml(lead.area)}</div>` : ''}
+          </td>
+          <td class="p-3">
+            ${lead.rating ? `<span class="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">★ ${lead.rating}</span>` : '<span class="text-slate-300">—</span>'}
+          </td>
+          <td class="p-3 text-slate-500 truncate max-w-[150px]">
+            ${lead.website ? `<a href="${lead.website}" target="_blank" class="text-indigo-600 hover:underline flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> ${lead.website.replace(/^https?:\/\//, '').slice(0, 18)}</a>` : '<span class="text-slate-300">—</span>'}
+          </td>
+        `;
+
+        tr.querySelector('.lead-checkbox').addEventListener('change', (e) => {
+          handleLeadToggle(lead.id, e.target.checked);
+        });
+        tbody.appendChild(tr);
+
+        // 2. Mobile Responsive Card
+        const card = document.createElement('div');
+        card.className = `p-3.5 rounded-xl border transition-all ${isSelected ? 'bg-purple-50/50 border-purple-300 shadow-2xs' : 'bg-slate-50 border-slate-200'}`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                class="mobile-lead-checkbox mt-1 rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                data-id="${lead.id}"
+                ${isSelected ? 'checked' : ''}
+              />
+              <div>
+                <div class="text-xs font-bold text-slate-900 font-heading leading-tight">${escapeHtml(lead.name || 'Unknown Business')}</div>
+                ${lead.contact_person ? `<div class="text-[10px] text-slate-500 mt-0.5">Contact: ${escapeHtml(lead.contact_person)}</div>` : ''}
+                <div class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(lead.city || '')} ${lead.area ? '&bull; ' + escapeHtml(lead.area) : ''}</div>
+              </div>
+            </div>
+            ${lead.rating ? `<span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">★ ${lead.rating}</span>` : ''}
+          </div>
+
+          <div class="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+            <div class="flex items-center gap-2">
+              ${lead.phone ? `<a href="tel:${escapeHtml(lead.phone)}" class="inline-flex items-center gap-1 text-indigo-700 font-medium bg-indigo-50 px-2 py-0.5 rounded"><i data-lucide="phone" class="w-3 h-3"></i> Call</a>` : ''}
+              ${hasEmail ? `<span class="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded truncate max-w-[160px]"><i data-lucide="mail" class="w-3 h-3"></i> ${escapeHtml(lead.email)}</span>` : '<span class="text-slate-400 text-[10px]">No email</span>'}
+            </div>
+            ${lead.website ? `<a href="${lead.website}" target="_blank" class="text-slate-500 hover:text-indigo-600"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>` : ''}
+          </div>
+        `;
+
+        card.querySelector('.mobile-lead-checkbox').addEventListener('change', (e) => {
+          handleLeadToggle(lead.id, e.target.checked);
+        });
+        mobileCards.appendChild(card);
+      });
+
+      lucide.createIcons({ root: tbody });
+      lucide.createIcons({ root: mobileCards });
+      document.getElementById('paginationInfo').textContent = `Showing ${startIdx + 1}–${endIdx} of ${totalItems} leads`;
+      renderPaginationButtons(totalItems);
+    }
+
+    function handleLeadToggle(leadId, isChecked) {
+      if (isChecked) {
+        AppState.selectedLeadIds.add(leadId);
+      } else {
+        AppState.selectedLeadIds.delete(leadId);
+      }
+      updateSelectionCounters();
+      updateInlinePreview();
+      
+      // Sync checkboxes
+      document.querySelectorAll(`input[data-id="${leadId}"]`).forEach(cb => {
+        cb.checked = isChecked;
+      });
+    }
+
+    function renderPaginationButtons(totalItems) {
+      const container = document.getElementById('paginationControls');
+      container.innerHTML = '';
+
+      const totalPages = Math.ceil(totalItems / AppState.pageSize);
+      if (totalPages <= 1) return;
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = `px-2 py-1 border border-slate-300 rounded text-xs font-semibold ${AppState.currentPage === 1 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer shadow-2xs'}`;
+      prevBtn.textContent = 'Prev';
+      prevBtn.disabled = AppState.currentPage === 1;
+      prevBtn.addEventListener('click', () => {
+        if (AppState.currentPage > 1) {
+          AppState.currentPage--;
+          renderTablePage();
+        }
+      });
+      container.appendChild(prevBtn);
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = `px-2 py-1 border border-slate-300 rounded text-xs font-semibold ${AppState.currentPage === totalPages ? 'opacity-40 cursor-not-allowed' : 'hover:bg-slate-100 cursor-pointer shadow-2xs'}`;
+      nextBtn.textContent = 'Next';
+      nextBtn.disabled = AppState.currentPage === totalPages;
+      nextBtn.addEventListener('click', () => {
+        if (AppState.currentPage < totalPages) {
+          AppState.currentPage++;
+          renderTablePage();
+        }
+      });
+      container.appendChild(nextBtn);
+    }
+
+    // Selection Controls
+    document.getElementById('btnSelectAll').addEventListener('click', () => {
+      AppState.filteredLeads.forEach(l => AppState.selectedLeadIds.add(l.id));
+      renderTablePage();
+      updateSelectionCounters();
+      updateInlinePreview();
+    });
+
+    document.getElementById('btnSelectWithEmail').addEventListener('click', selectAllWithEmail);
+    document.getElementById('btnQuickSelectOutreach').addEventListener('click', selectAllWithEmail);
+
+    function selectAllWithEmail() {
+      AppState.selectedLeadIds.clear();
+      AppState.filteredLeads.forEach(l => {
+        if (l.email && l.email.includes('@')) {
+          AppState.selectedLeadIds.add(l.id);
+        }
+      });
+      renderTablePage();
+      updateSelectionCounters();
+      updateInlinePreview();
+      showToast(`Selected all verified emails (${AppState.selectedLeadIds.size} leads)`, 'info');
+    }
+
+    document.getElementById('btnClearSelection').addEventListener('click', () => {
+      AppState.selectedLeadIds.clear();
+      renderTablePage();
+      updateSelectionCounters();
+      updateInlinePreview();
+    });
+
+    document.getElementById('thMasterCheckbox').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        AppState.filteredLeads.forEach(l => AppState.selectedLeadIds.add(l.id));
+      } else {
+        AppState.selectedLeadIds.clear();
+      }
+      renderTablePage();
+      updateSelectionCounters();
+      updateInlinePreview();
+    });
+
+    function updateSelectionCounters() {
+      const count = AppState.selectedLeadIds.size;
+      document.getElementById('selectionCountBadge').textContent = `${count} leads selected`;
+      document.getElementById('proceedOutreachText').textContent = `Launch Outreach (${count} Selected)`;
+
+      const audienceSummary = document.getElementById('outreachAudienceSummary');
+      const leadsWithEmailCount = Array.from(AppState.selectedLeadIds)
+        .map(id => AppState.allLeads.find(l => l.id === id))
+        .filter(l => l && l.email && l.email.includes('@')).length;
+
+      audienceSummary.textContent = `Targeting: ${count} Selected (${leadsWithEmailCount} with valid email)`;
+    }
+
+    document.getElementById('btnProceedOutreach').addEventListener('click', () => {
+      const count = AppState.selectedLeadIds.size;
+      if (count === 0) {
+        showToast('Please select at least 1 lead to launch outreach', 'warning');
+        return;
+      }
+      document.getElementById('outreachSection').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // On-Device Export Handlers (SheetJS XLSX + CSV)
+    document.getElementById('btnDownloadExcel').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (AppState.allLeads.length === 0) {
+        showToast('No leads available to export', 'warning');
+        return;
+      }
+      MobileEngine.Exporter.downloadExcel(AppState.allLeads, `Leads_${(AppState.currentJobId || 'dataset').slice(0, 8)}.xlsx`);
+      showToast('Excel spreadsheet generated and saved on device!', 'success');
+    });
+
+    document.getElementById('btnDownloadCsv').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (AppState.allLeads.length === 0) {
+        showToast('No leads available to export', 'warning');
+        return;
+      }
+      MobileEngine.Exporter.downloadCsv(AppState.allLeads, `Leads_${(AppState.currentJobId || 'dataset').slice(0, 8)}.csv`);
+      showToast('CSV file generated and saved on device!', 'success');
+    });
+
+    // 1-TAP HIGH-CONVERTING CAMPAIGN PRESETS
+    const CAMPAIGN_PRESETS = {
+      intro: {
+        subject: "quick question re: {business_name}",
+        body: `Hi {contact_person},
+
+Noticed your work at {business_name} in {city}.
+
+We built a streamlined platform that helps verified businesses in your industry boost high-ticket inquiries and automate customer outreach.
+
+Would you be open to a brief 5-minute chat this week to see if it makes sense for {business_name}?
+
+Best regards,
+{sender_name}`
+      },
+      value: {
+        subject: "idea for {business_name} - operational efficiency",
+        body: `Hi {contact_person},
+
+I was looking into top-rated services in {city} and came across {business_name}.
+
+We recently helped teams in your domain cut down customer turnaround time while increasing verified client inquiries by over 40%.
+
+Check out a brief 60-second video demo here: {video_link}
+
+Happy to share our short case study if you're interested. Let me know!
+
+Cheers,
+{sender_name}`
+      },
+      partnership: {
+        subject: "exploring strategic partnership with {business_name}",
+        body: `Hi {contact_person},
+
+Reaching out from our team — we really admire the track record of {business_name} in {city}.
+
+We work with premier local businesses to refer qualified, high-intent client inquiries and share mutual growth opportunities.
+
+Do you have a few minutes this week to connect?
+
+Best regards,
+{sender_name}`
+      },
+      lavender: {
+        subject: "{business_name} + our team",
+        body: `Hi {contact_person},
+
+Are you currently taking on new clients for {business_name}?
+
+We send verified, high-intent client referrals directly to service providers in {city}.
+
+Worth a brief conversation to see if we'd be a good fit?
+
+Thanks,
+{sender_name}`
+      }
+    };
+
+    document.querySelectorAll('.campaign-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-preset');
+        const preset = CAMPAIGN_PRESETS[key];
+        if (!preset) return;
+
+        document.getElementById('campaignSubject').value = preset.subject;
+        document.getElementById('campaignBody').value = preset.body;
+        updateInlinePreview();
+        showToast(`Loaded ${btn.querySelector('div').textContent} preset!`, 'success');
+        document.getElementById('campaignSubject').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+
+    // Live Inline Preview Generator
+    function updateInlinePreview() {
+      const subject = document.getElementById('campaignSubject').value || 'quick question re: {business_name}';
+      const body = document.getElementById('campaignBody').value || 'Hi {contact_person}, noticed {business_name}...';
+
+      let sampleLead = null;
+      if (AppState.selectedLeadIds.size > 0) {
+        const firstId = Array.from(AppState.selectedLeadIds)[0];
+        sampleLead = AppState.allLeads.find(l => l.id === firstId);
+      }
+      if (!sampleLead && AppState.allLeads.length > 0) {
+        sampleLead = AppState.allLeads[0];
+      }
+      if (!sampleLead) {
+        sampleLead = { name: 'Acme Pet Clinic', contact_person: 'Rahul', city: 'Hyderabad', email: 'contact@acme.com' };
+      }
+
+      document.getElementById('inlinePreviewLeadName').textContent = `${sampleLead.name || 'Sample Business'} (${sampleLead.city || 'City'})`;
+
+      const rep = (str) => {
+        return str
+          .replace(/{business_name}/gi, sampleLead.name || 'Sample Business')
+          .replace(/{contact_person}/gi, sampleLead.contact_person || 'Owner')
+          .replace(/{city}/gi, sampleLead.city || 'Your City')
+          .replace(/{video_link}/gi, document.getElementById('aiVideoLink').value.trim() || 'https://youtu.be/demo')
+          .replace(/{sender_name}/gi, 'Our Team');
+      };
+
+      document.getElementById('inlinePreviewSubject').textContent = rep(subject);
+      document.getElementById('inlinePreviewBody').textContent = rep(body);
+    }
+
+    document.getElementById('campaignSubject').addEventListener('input', updateInlinePreview);
+    document.getElementById('campaignBody').addEventListener('input', updateInlinePreview);
+
+    // On-Device Gemini AI Copywriter
+    document.getElementById('btnGenerateAiEmail').addEventListener('click', async () => {
+      const prodName = document.getElementById('aiProductName').value.trim();
+      const prodDesc = document.getElementById('aiProductDesc').value.trim();
+      const niche = document.getElementById('aiTargetNiche').value.trim();
+      const tone = document.getElementById('aiToneSelect').value;
+      const video = document.getElementById('aiVideoLink').value.trim();
+      const keyOverride = document.getElementById('aiKeyOverride').value.trim();
+
+      if (!prodName && !prodDesc) {
+        showToast('Please enter what you are offering', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('btnGenerateAiEmail');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i><span>Generating with Gemini AI...</span>`;
+      btn.disabled = true;
+      lucide.createIcons({ root: btn });
+
+      try {
+        const data = await MobileEngine.Gemini.generateEmail({
+          productName: prodName,
+          productDesc: prodDesc,
+          targetNiche: niche,
+          tone: tone,
+          videoLink: video,
+          apiKey: keyOverride
+        });
+        
+        if (data.subject_lines && data.subject_lines.length > 0) {
+          document.getElementById('campaignSubject').value = data.subject_lines[0];
+          
+          const subjectContainer = document.getElementById('aiSubjectList');
+          subjectContainer.innerHTML = '';
+          data.subject_lines.forEach((s) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'text-left text-xs px-2.5 py-1.5 rounded-lg bg-white border border-purple-200 text-purple-900 hover:bg-purple-100/60 font-medium transition-colors cursor-pointer flex items-center justify-between shadow-2xs';
+            chip.innerHTML = `<span>${escapeHtml(s)}</span> <span class="text-[10px] text-purple-600 font-bold">Use</span>`;
+            chip.addEventListener('click', () => {
+              document.getElementById('campaignSubject').value = s;
+              updateInlinePreview();
+              showToast('Subject line updated!', 'info');
+            });
+            subjectContainer.appendChild(chip);
+          });
+          document.getElementById('aiSuggestionsBox').classList.remove('hidden');
+        }
+
+        if (data.email_body) {
+          document.getElementById('campaignBody').value = data.email_body;
+        }
+
+        if (data.strategy_breakdown) {
+          document.getElementById('aiStrategyReasoning').textContent = data.strategy_breakdown;
+        }
+
+        updateInlinePreview();
+        showToast('Gemini AI email generated successfully!', 'success');
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        lucide.createIcons({ root: btn });
+      }
+    });
+
+    // Merge Tag Insertion (Caret-aware)
+    document.querySelectorAll('.btn-tag').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tag = btn.getAttribute('data-tag');
+        const textarea = document.getElementById('campaignBody');
+        const start = textarea.selectionStart || textarea.value.length;
+        const end = textarea.selectionEnd || textarea.value.length;
+
+        textarea.value = textarea.value.substring(0, start) + tag + textarea.value.substring(end);
+        textarea.focus();
+        textarea.setSelectionRange(start + tag.length, start + tag.length);
+        updateInlinePreview();
+      });
+    });
+
+    // 1-Tap Open in Native Gmail / Email App Intent
+    document.getElementById('btnNativeMail').addEventListener('click', () => {
+      const subject = document.getElementById('campaignSubject').value.trim();
+      const body = document.getElementById('campaignBody').value.trim();
+
+      if (!subject || !body) {
+        showToast('Please provide email subject and body', 'warning');
+        return;
+      }
+
+      const selectedWithEmail = Array.from(AppState.selectedLeadIds)
+        .map(id => AppState.allLeads.find(l => l.id === id))
+        .filter(l => l && l.email && l.email.includes('@'));
+
+      if (selectedWithEmail.length === 0) {
+        showToast('Please select at least 1 lead with an email address', 'warning');
+        return;
+      }
+
+      const targetLead = selectedWithEmail[0];
+      const rep = (str) => {
+        return str
+          .replace(/{business_name}/gi, targetLead.name || '')
+          .replace(/{contact_person}/gi, targetLead.contact_person || 'Owner')
+          .replace(/{city}/gi, targetLead.city || '')
+          .replace(/{video_link}/gi, document.getElementById('aiVideoLink').value.trim() || '')
+          .replace(/{sender_name}/gi, 'Our Team');
+      };
+
+      const renderedSubject = rep(subject);
+      const renderedBody = rep(body);
+      const mailtoUrl = `mailto:${encodeURIComponent(targetLead.email)}?subject=${encodeURIComponent(renderedSubject)}&body=${encodeURIComponent(renderedBody)}`;
+      
+      window.location.href = mailtoUrl;
+      showToast(`Draft opened in mobile email app for ${targetLead.name}!`, 'success');
+    });
+
+    // Full Email Preview Modal
+    document.getElementById('btnPreviewEmail').addEventListener('click', () => {
+      const subject = document.getElementById('campaignSubject').value.trim();
+      const body = document.getElementById('campaignBody').value.trim();
+
+      if (!subject || !body) {
+        showToast('Please provide subject and body to preview', 'warning');
+        return;
+      }
+
+      const selectedLead = Array.from(AppState.selectedLeadIds)
+        .map(id => AppState.allLeads.find(l => l.id === id))
+        .filter(Boolean)[0] || AppState.allLeads[0] || { name: 'Acme Pet Clinic', city: 'Hyderabad' };
+
+      const rep = (str) => str
+        .replace(/{business_name}/gi, selectedLead.name || 'Sample Business')
+        .replace(/{contact_person}/gi, selectedLead.contact_person || 'Owner')
+        .replace(/{city}/gi, selectedLead.city || 'Your City')
+        .replace(/{video_link}/gi, document.getElementById('aiVideoLink').value.trim() || 'https://youtu.be/demo')
+        .replace(/{sender_name}/gi, 'Our Team');
+
+      document.getElementById('previewSubjectText').textContent = rep(subject);
+      document.getElementById('previewLeadInfo').textContent = `Rendered for: ${selectedLead.name} (${selectedLead.city || 'City'})`;
+
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; padding: 20px;">
+          ${escapeHtml(rep(body)).replace(/\n/g, '<br/>')}
+        </div>
+      `;
+
+      const iframe = document.getElementById('previewIframe');
+      iframe.srcdoc = htmlContent;
+      document.getElementById('previewModal').classList.remove('hidden');
+    });
+
+    document.getElementById('btnClosePreview').addEventListener('click', () => {
+      document.getElementById('previewModal').classList.add('hidden');
+    });
+    document.getElementById('btnClosePreviewBottom').addEventListener('click', () => {
+      document.getElementById('previewModal').classList.add('hidden');
+    });
+
+    // History Modal (Local Monolith Storage)
+    document.getElementById('btnOpenHistory').addEventListener('click', () => {
+      const list = document.getElementById('historyListContainer');
+      list.innerHTML = '';
+
+      const jobs = MobileEngine.DB.getJobs();
+
+      if (!jobs || jobs.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">No previous jobs recorded on device.</p>`;
+      } else {
+        jobs.forEach(j => {
+          const card = document.createElement('div');
+          card.className = 'p-3.5 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors flex items-center justify-between shadow-2xs';
+          const date = new Date(j.created_at || Date.now()).toLocaleDateString() + ' ' + new Date(j.created_at || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          
+          card.innerHTML = `
+            <div>
+              <div class="text-xs font-bold text-slate-900 font-heading">${escapeHtml(j.query || 'Scrape Job')}</div>
+              <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                <span>${date}</span> &bull; 
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${j.lead_count > 0 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-slate-100 text-slate-500'}">
+                  ${j.lead_count || 0} leads
+                </span>
+              </div>
+            </div>
+            <button class="px-3 py-1.5 text-xs font-semibold bg-white border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 cursor-pointer shadow-2xs active:scale-98">
+              Load Dataset
+            </button>
+          `;
+
+          card.querySelector('button').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.add('hidden');
+            const leads = MobileEngine.DB.getLeads(j.id);
+            setLoadedLeads(leads, j.id);
+            showToast(`Loaded ${leads.length} leads!`, 'info');
+          });
+
+          list.appendChild(card);
+        });
+      }
+
+      document.getElementById('historyModal').classList.remove('hidden');
+    });
+
+    document.getElementById('btnCloseHistory').addEventListener('click', () => {
+      document.getElementById('historyModal').classList.add('hidden');
+    });
+
+    // Navigation Tabs Scrolling (Mobile + Desktop)
+    document.querySelectorAll('.nav-desktop-tab, .mobile-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-target');
+        if (!targetId) return;
+        const targetElem = document.getElementById(targetId);
+        if (targetElem) {
+          targetElem.classList.remove('hidden');
+          targetElem.scrollIntoView({ behavior: 'smooth' });
+
+          document.querySelectorAll('.nav-desktop-tab').forEach(t => t.classList.remove('nav-tab-active'));
+          document.querySelectorAll('.mobile-tab-btn').forEach(t => t.classList.remove('mobile-tab-active'));
+          
+          if (btn.classList.contains('nav-desktop-tab')) btn.classList.add('nav-tab-active');
+          if (btn.classList.contains('mobile-tab-btn')) btn.classList.add('mobile-tab-active');
+        }
+      });
+    });
+
+    // Helper: HTML Escaper
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Auto-load latest dataset on startup (Pre-seeded with 605 leads)
+    function autoLoadMonolithData() {
+      try {
+        const jobs = MobileEngine.DB.getJobs();
+        if (jobs && jobs.length > 0) {
+          const topJob = jobs[0];
+          const leads = MobileEngine.DB.getLeads(topJob.id);
+          setLoadedLeads(leads, topJob.id);
+        }
+      } catch (e) {
+        console.warn('Auto-load error:', e);
+      }
+    }
+    autoLoadMonolithData();
+  </script>
+</body>
+</html>

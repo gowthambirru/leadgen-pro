@@ -1,0 +1,50 @@
+# ==============================================================
+# LeadGen Pro — .gitignore
+# ==============================================================
+
+# Mobile App & Build Artifacts (Excluded per instructions)
+android/
+*.apk
+LeadGenPro-*.apk
+capacitor.config.json
+package.json
+package-lock.json
+node_modules/
+www/
+
+# External / Unrelated Projects
+editing portfolio/
+editing portfolio
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+*.env
+!.env.example
+
+# Local SQLite Database & Storage
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Exports & Generated Files
+downloads/
+*.xlsx
+*.csv
+
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor & OS Artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
